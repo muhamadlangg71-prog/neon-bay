@@ -10,6 +10,7 @@ export function createAudio() {
   let sirenGain = null;
   let muted = false;
   let musicOn = false;
+  let wavesOn = false;
 
   function ensure() {
     if (ctx) {
@@ -141,6 +142,35 @@ export function createAudio() {
     },
     click() {
       blip(700, 0.05, 'square', 0.1);
+    },
+    reload() {
+      // Magazine out, magazine in: two short metallic clicks.
+      noiseBurst(0.05, 0.25, 3000);
+      setTimeout(() => noiseBurst(0.06, 0.3, 1800), 220);
+    },
+    startWaves() {
+      // Gentle surf: looping noise through a low-pass, swell driven by an LFO.
+      if (!ensure() || wavesOn) return;
+      wavesOn = true;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuffer(3);
+      src.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 420;
+      const gain = ctx.createGain();
+      gain.gain.value = 0.035;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.11;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0.022;
+      lfo.connect(lfoGain);
+      lfoGain.connect(gain.gain);
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(master);
+      src.start();
+      lfo.start();
     },
     crash() {
       noiseBurst(0.25, 0.4, 800);

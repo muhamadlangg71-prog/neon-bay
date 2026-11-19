@@ -50,7 +50,7 @@ function groundTexture() {
   g.fillRect(toPx(-104), toPx(-104), toPx(-52) - toPx(-104), toPx(-52) - toPx(-104));
   g.fillRect(toPx(52), toPx(156), toPx(104) - toPx(52), toPx(208) - toPx(156));
   // Roads: asphalt strips on every grid line.
-  g.fillStyle = '#2b2e35';
+  g.fillStyle = '#3d414c';
   for (let i = -GRID; i <= GRID; i += 1) {
     const p = toPx(i * STEP);
     const w = (WORLD.roadWidth / 560) * S;
@@ -134,7 +134,7 @@ export function buildCity(scene, random) {
   sun.shadow.bias = -0.0005;
   scene.add(sun);
   scene.add(sun.target);
-  scene.add(new THREE.HemisphereLight(0xffd9a0, 0x54456a, 0.85));
+  scene.add(new THREE.HemisphereLight(0xffd9a0, 0x54456a, 1.05));
   // Sun disc.
   const sunDisc = new THREE.Mesh(
     new THREE.CircleGeometry(34, 32),
@@ -154,7 +154,7 @@ export function buildCity(scene, random) {
   scene.add(ground);
 
   // --- Water (east ocean + south harbour) ------------------------------------
-  const waterMat = new THREE.MeshLambertMaterial({ color: 0x1f6f9e, transparent: true, opacity: 0.92 });
+  const waterMat = new THREE.MeshLambertMaterial({ color: 0x1f8fa3, transparent: true, opacity: 0.92 });
   const ocean = new THREE.Mesh(new THREE.PlaneGeometry(420, 560), waterMat);
   ocean.rotation.x = -Math.PI / 2;
   ocean.position.set(260 + 210, -0.4, 0);
@@ -252,17 +252,18 @@ export function buildCity(scene, random) {
   addBuilding(130, 130, 30, 24, 42, 1);
   landmarks.bank = { x: 130, z: 130 };
   addSign('MARINA BANK', 130, 44.5, 117);
-  // Ray's Garage.
+  // Nia's Workshop.
   addBuilding(-78, -78, 30, 20, 10, 0);
   landmarks.garage = { x: -78, z: -78 };
-  addSign("RAY'S GARAGE", -78, 12.5, -67);
+  addSign("NIA'S WORKSHOP", -78, 12.5, -67);
   // Hospital.
   addBuilding(26, 234, 34, 22, 16, 5);
   landmarks.hospital = { x: 26, z: 234 };
   addSign('GENERAL HOSPITAL', 26, 18.5, 222);
-  // Marina tower on the beach road.
+  // Hotel Solaris tower on the beach road.
   addBuilding(180, 26, 24, 24, 55, 4);
   landmarks.marina = { x: 180, z: 26 };
+  addSign('HOTEL SOLARIS', 180, 57, 13);
 
   // --- Palms -------------------------------------------------------------------
   const trunkMat = new THREE.MeshLambertMaterial({ color: 0x7a5a3a });
@@ -359,7 +360,7 @@ export function buildCity(scene, random) {
     new THREE.CylinderGeometry(95, 105, 3, 24),
     new THREE.MeshLambertMaterial({ color: 0x7a9a5a }),
   );
-  island.position.set(0, 0.5, -380);
+  island.position.set(0, -1, -380);
   island.receiveShadow = true;
   scene.add(island);
   // Island sand ring + lighthouse.
@@ -368,7 +369,7 @@ export function buildCity(scene, random) {
     new THREE.MeshLambertMaterial({ color: 0xd9b77c }),
   );
   sandRing.rotation.x = Math.PI / 2;
-  sandRing.position.set(0, 1.2, -380);
+  sandRing.position.set(0, -0.3, -380);
   scene.add(sandRing);
   const lighthouse = new THREE.Group();
   const tower = new THREE.Mesh(
@@ -383,7 +384,7 @@ export function buildCity(scene, random) {
   );
   lampRoom.position.y = 23;
   lighthouse.add(tower, lampRoom);
-  lighthouse.position.set(-30, 2, -390);
+  lighthouse.position.set(-30, 0.5, -390);
   scene.add(lighthouse);
   colliders.push({ x0: -35, z0: -395, x1: -25, z1: -385 });
   landmarks.island = { x: 0, z: -380 };

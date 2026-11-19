@@ -2,10 +2,10 @@
 // ?seed=N fixes the city. ?shot=chase|walk|mission|vista stages that scene instead of
 // running the loop, paints it and sets window.__shotReady for a screenshot.
 import * as THREE from '../vendor/three.module.min.js';
-import { PLAYER, SAVE_KEY, STEP, WORLD } from './config.js';
+import { PLAYER, SAVE_KEY, STEP, WORLD, districtAt, rankForRep } from './config.js';
 import { createRandom } from './random.js';
 import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { buildCity, districtAt } from './city.js';
+import { buildCity } from './city.js';
 import { createCarMesh, createTraffic, drivePlayerCar } from './vehicles.js';
 import { createPeds } from './peds.js';
 import { createPolice } from './police.js';
@@ -50,9 +50,10 @@ const missions = createMissions(city, scene, traffic, audio, {
     hud.setObjective(m.objective);
     statusEl.textContent = `Mission ${m.id}: ${m.title}. ${m.brief}`;
   },
-  onMissionComplete(m, reward) {
-    hud.banner('MISSION COMPLETE', `${m.title} — +$${reward}`, 3200);
-    hud.toast(`Mission complete: ${m.title} (+$${reward})`);
+  onMissionComplete(m, reward, rep) {
+    hud.banner('MISSION COMPLETE', `${m.title} — +$${reward}  +${rep} rep`, 3200);
+    hud.toast(`Mission complete: ${m.title} (+$${reward}, +${rep} rep)`);
+    hud.setRep(player.rep, rankForRep(player.rep));
   },
   onStoryComplete() {
     hud.showScreen('complete');
@@ -113,6 +114,7 @@ const player = {
   camPitch: 0.32,
   health: PLAYER.maxHealth,
   money: 0,
+  rep: 0,
   inCar: false,
   car: null,
   walkPhase: 0,
@@ -150,6 +152,7 @@ function saveGame() {
       SAVE_KEY,
       JSON.stringify({
         money: player.money,
+        rep: player.rep,
         missionIndex: missions.done ? 99 : Math.max(0, missions.index),
         x: player.x,
         z: player.z,
@@ -173,6 +176,7 @@ function readSave() {
 
 function loadSave(save) {
   player.money = save.money || 0;
+  player.rep = save.rep || 0;
   player.x = save.x ?? 0;
   player.z = save.z ?? 26;
   player.heading = save.heading ?? 0;
@@ -195,6 +199,7 @@ function newGame() {
   player.camYaw = 0;
   player.health = PLAYER.maxHealth;
   player.money = 0;
+  player.rep = 0;
   player.inCar = false;
   player.car = null;
   police.reset();
@@ -267,6 +272,10 @@ function tryEnterCar() {
   if (nearPolice) {
     police.addWanted(1);
     hud.toast('Car stolen — the cops saw that!');
+  } else if (police.isHidden) {
+    // A fresh car while out of sight muddies the description: one star drops.
+    police.addWanted(-1);
+    hud.toast('New wheels — the PD lost your description for a moment.');
   }
   input.lockPointer();
 }
@@ -453,10 +462,12 @@ function step(dt) {
   // HUD.
   hud.setHealth(player.health, PLAYER.maxHealth);
   hud.setMoney(player.money);
+  hud.setRep(player.rep, rankForRep(player.rep));
+  hud.setAmmo(combat.ammo, combat.magSize, combat.reloading);
   hud.setWanted(police.wanted);
   hud.setDistrict(districtAt(player.x, player.z));
   const m = missions.current();
-  hud.setObjective(m ? m.objective : 'Free roam — explore Neon Bay. Missions complete!');
+  hud.setObjective(m ? m.objective : 'Free roam — explore Neon Bay.');
   const nearCar = !player.inCar ? traffic.nearest(player.x, player.z, 4.2) : null;
   hud.setHint(
     player.inCar
@@ -465,11 +476,14 @@ function step(dt) {
         ? 'Press E to steal this car'
         : 'WASD move • Shift run • Click shoot • F punch • E enter car',
   );
+  const policeUnits = [...police.units];
+  const heliPos = police.heliPos;
+  if (heliPos) policeUnits.push({ x: heliPos.x, z: heliPos.z, kind: 'heli' });
   hud.drawMinimap({
     time,
     player,
     target: missions.target,
-    policeUnits: police.units,
+    policeUnits,
   });
 }
 
@@ -495,6 +509,7 @@ function resumeGame() {
 function startPlaying() {
   audio.unlock();
   audio.startMusic();
+  audio.startWaves();
   hud.hideScreens();
   screen = 'play';
   input.lockPointer();
@@ -657,6 +672,8 @@ if (shot) {
 }
 
 // Expose a little debug surface for the finalist review's console checks.
+// Read-only state plus the live objects, so the story can be driven and
+// inspected from the console (teleport the player, check a mission, and so on).
 window.__neonBay = {
   get screen() {
     return screen;
@@ -667,6 +684,21 @@ window.__neonBay = {
   get mission() {
     const m = missions.current();
     return m ? m.title : 'free roam';
+  },
+  get player() {
+    return player;
+  },
+  get missions() {
+    return missions;
+  },
+  get police() {
+    return police;
+  },
+  get combat() {
+    return combat;
+  },
+  get traffic() {
+    return traffic;
   },
   version: 'neon-bay-1.0.0',
 };

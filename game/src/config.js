@@ -13,9 +13,10 @@ export const WORLD = {
 };
 
 export const DISTRICTS = [
-  { name: 'Downtown', x0: -130, z0: -130, x1: 130, z1: 130, tall: true },
-  { name: 'Palmera Beach', x0: 130, z0: -130, x1: 260, z1: 130, tall: false },
+  { name: 'Old Port', x0: -130, z0: -130, x1: 130, z1: 130, tall: true },
+  { name: 'Palm Strip', x0: 130, z0: -130, x1: 260, z1: 130, tall: false },
   { name: 'The Docks', x0: -260, z0: 130, x1: 260, z1: 260, tall: false },
+  { name: 'Palm Heights', x0: -90, z0: -290, x1: 90, z1: -130, tall: false },
   { name: 'Cayo Verde', x0: -90, z0: -420, x1: 90, z1: -290, tall: false },
 ];
 
@@ -25,6 +26,14 @@ export function districtAt(x, z) {
   }
   return 'Neon Bay';
 }
+
+export const COMBAT = {
+  /** Pistol magazine size and reload time. */
+  magSize: 12,
+  reloadSeconds: 1.4,
+  /** Seconds a punch combo stays open for the next hit. */
+  punchComboWindow: 0.9,
+};
 
 export const PLAYER = {
   walkSpeed: 6,
@@ -62,66 +71,109 @@ export const WANTED = {
   seenRadius: 70,
 };
 
-/** Mission chain. `at` is the objective point; `kind` drives the rules in missions.js. */
+/** The story (design: six missions, three acts). `at` is the objective point;
+ *  `kind` drives the rules in missions.js. `rep` is reputation on completion. */
 export const MISSIONS = [
   {
     id: 1,
-    title: 'First Wheels',
-    brief: 'Jax needs a car. Steal any car off the street (walk up and press E), then drive to the yellow marker.',
-    objective: 'Steal a car and drive to the marker',
-    at: { x: 104, z: -52 },
-    kind: 'driveTo',
-    reward: 150,
+    title: 'Comeback Lap',
+    brief: 'Two years inside, and Vane took your Comet, your shop, your name. The Comet is sitting in the Docks impound — take it back and get it to Nia\u2019s garage. The men watching it carry Vane Development contracts.',
+    objective: 'Take back your Comet from the impound',
+    at: { x: -104, z: 182 },
+    at2: { x: -78, z: -52 },
+    kind: 'stealDeliver',
+    reward: 1500,
+    rep: 100,
+    wantedOnSteal: 2,
+    spawnColor: 0xff7a1a,
+    spawnSport: true,
+    spawnOwner: 'jax',
+    stealToast: 'The Comet is yours again — Vane\u2019s men are coming. Get it to Nia\u2019s garage.',
   },
   {
     id: 2,
-    title: 'The Pickup',
-    brief: 'Maya is waiting at the Palmera corner. Pick her up, then take her to the Docks — and keep the car in one piece.',
-    objective: 'Pick up Maya, then drive to the Docks',
-    at: { x: -52, z: 104 },
-    at2: { x: 0, z: 234 },
+    title: 'Pier 49',
+    brief: 'The crew lifted Vane\u2019s case at the container terminal. You drive. Get them across the drawbridge to Cayo Verde before it rises — and before the PD boxes you in.',
+    objective: 'Pick up the crew, then cross the bridge to Cayo Verde',
+    at: { x: 52, z: 208 },
+    at2: { x: 0, z: -350 },
     kind: 'pickup',
-    reward: 250,
+    reward: 4000,
+    rep: 250,
+    pickupToast: 'Crew\u2019s in. \"It\u2019s not cash — it\u2019s a drive. The Tideglass. Vane and Chief Sorn framed you, Jax.\" Bridge. Now!',
   },
   {
     id: 3,
-    title: 'Valet of the Year',
-    brief: 'Pose as the Marina Hotel valet and lift three cars, each fob opening a more exclusive garage. The mayor\'s sunrise-orange Comet GT is the prize — its dashcam proves your client framed a rival. Deliver it to Ray\'s garage, and decide what the footage is worth.',
-    objective: 'Steal the Comet GT — its dashcam proves the setup',
+    title: 'Valet Service',
+    brief: 'Vane is throwing a gala at the Hotel Solaris. You are the valet. Lift the encryption module out of his armoured SUV and bring it to Kite — it is the key that unlocks the Tideglass drive.',
+    objective: 'Steal the encryption module from Vane\u2019s SUV',
     at: { x: 182, z: 52 },
-    at2: { x: -78, z: -78 },
+    at2: { x: -78, z: -52 },
     kind: 'stealDeliver',
-    reward: 500,
+    reward: 7000,
+    rep: 400,
+    wantedOnSteal: 2,
+    spawnColor: 0x11131a,
+    spawnSport: false,
+    spawnOwner: 'vane',
+    stealToast: 'Module secured. Kite can crack the drive now — lose the gala security and get to the garage.',
   },
   {
     id: 4,
-    title: 'Dockside Deal',
-    brief: 'The deal at the Docks went bad. The Harbormaster\'s crew is waiting with guns. Take them down on foot and grab the package.',
-    objective: 'Clear the ambush and take the package',
-    at: { x: 52, z: 234 },
+    title: 'Wrecking Ball',
+    brief: 'Vane sent three demolition trucks to flatten Old Port, starting with Nia\u2019s workshop. Hold the line while Kite copies the ledger — and whatever happens, do not let them take the shop.',
+    objective: 'Stop the demolition crew — defend Nia\u2019s workshop',
+    at: { x: -78, z: -52 },
     kind: 'combat',
-    reward: 600,
+    reward: 10000,
+    rep: 600,
+    ambushToast: 'Demolition crew! Vane\u2019s men are tearing the workshop down — take them out.',
+    grabToast: 'Crew down. Grab the ledger copy — Kite needs it off-site, now.',
   },
   {
     id: 5,
-    title: 'The Getaway',
-    brief: 'Three stars and the whole Neon Bay PD on your tail. Cross the bridge to Cayo Verde and stay out of sight until the heat dies.',
-    objective: 'Reach Cayo Verde and lose the cops',
-    at: { x: 0, z: -350 },
-    kind: 'escape',
-    reward: 400,
+    title: 'Dead Air',
+    brief: 'Kite is going to broadcast the Tideglass live, during Vane\u2019s marina ground-breaking. Escort the broadcast van through all three relay zones — the whole city will be watching, and so will the PD.',
+    objective: 'Escort the broadcast van — relay 1 of 3',
+    at: { x: 52, z: -52 },
+    at2: { x: -104, z: 52 },
+    at3: { x: 104, z: 130 },
+    kind: 'escort',
+    reward: 15000,
+    rep: 800,
   },
   {
     id: 6,
-    title: 'The Big Score',
-    brief: 'The Marina Bank keeps its cash in the back room. Walk in, grab it, and get back to the safehouse — the city will be looking for you.',
-    objective: 'Rob the Marina Bank, then reach the safehouse',
-    at: { x: 130, z: 130 },
-    at2: { x: 78, z: 78 },
-    kind: 'robbery',
-    reward: 2500,
+    title: 'Last Exit: Neon Bay',
+    brief: 'Vane is running. His armoured limo is a decoy — he is fleeing in YOUR stolen Comet, heading for the seaplane at the marina. Take the Comet back without wrecking it, and end this.',
+    objective: 'Reclaim your Comet at the marina',
+    at: { x: 156, z: 26 },
+    at2: { x: 78, z: 52 },
+    kind: 'stealDeliver',
+    reward: 50000,
+    rep: 1000,
+    wantedOnSteal: 5,
+    spawnColor: 0xff7a1a,
+    spawnSport: true,
+    spawnOwner: 'jax',
+    stealToast: 'That\u2019s your Comet — and Vane\u2019s in it. Five stars, the whole PD, and one seaplane to beat. Bring it home.',
   },
 ];
+
+/** Reputation ranks — they open jobs, cars and mods, never the story itself. */
+export const RANKS = [
+  { name: 'Rookie', rep: 0 },
+  { name: 'Courier', rep: 500 },
+  { name: 'Wheelman', rep: 1500 },
+  { name: 'Kingpin', rep: 3500 },
+  { name: 'Neon Legend', rep: 6000 },
+];
+
+export function rankForRep(rep) {
+  let rank = RANKS[0];
+  for (const r of RANKS) if (rep >= r.rep) rank = r;
+  return rank.name;
+}
 
 export const SAVE_KEY = 'neon-bay-save-v1';
 export const BEST_KEY = 'neon-bay-best-v1';
@@ -137,13 +189,17 @@ export const CAR_OWNERS = [
   { owner: 'Banker Oka', car: 'Sedan', perk: 'Toll account, fully loaded' },
   { owner: 'Fisherman Bo', car: 'Pickup', perk: 'Harbour master key' },
   { owner: 'Professor Lin', car: 'Hatchback', perk: 'University garage card' },
-  { owner: 'Mayor Delgado', car: 'Comet GT', perk: 'Dashcam — and a secret' },
+  { owner: 'Silas Vane', car: 'Armoured SUV', perk: 'Encryption module — and a secret' },
 ];
+
+/** The two story cars. `spawnOwner: 'jax' | 'vane'` in a mission picks one of these. */
+export const JAX_CAR = { owner: 'Jax Marlowe', car: 'Comet GT', perk: 'Your car. Your name on the title.' };
+export const VANE_SUV = { owner: 'Silas Vane', car: 'Armoured SUV', perk: 'Encryption module — and a secret' };
 
 /** Small street events the city stages for itself, built from the pedestrians
  *  already walking around: a crowd, a moment, then everyone moves on. */
 export const STREET_EVENTS = [
-  { label: 'Street performers draw a crowd on Palmera', kind: 'buskers' },
+  { label: 'Street performers draw a crowd on Palm Strip', kind: 'buskers' },
   { label: 'Tourists stop for photos by the boardwalk', kind: 'tourists' },
   { label: 'A vendor and a cabbie argue over a parking spot', kind: 'argument' },
   { label: 'Someone is failing a parallel park — badly', kind: 'parking' },

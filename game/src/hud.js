@@ -33,6 +33,16 @@ export function createHud(doc) {
     setMoney(amount) {
       moneyText.textContent = `$${Math.floor(amount).toLocaleString('en-US')}`;
     },
+    setRep(rep, rank) {
+      const el = $('rep');
+      if (el) el.textContent = `${rank} • ${Math.floor(rep)} rep`;
+    },
+    setAmmo(ammo, magSize, reloading) {
+      const el = $('ammo');
+      if (!el) return;
+      el.textContent = reloading ? 'RELOADING…' : `AMMO ${ammo}/${magSize}`;
+      el.classList.toggle('low', !reloading && ammo <= 3);
+    },
     setWanted(stars) {
       let s = '';
       for (let i = 0; i < 5; i += 1) s += i < stars ? STAR_ON : STAR_OFF;

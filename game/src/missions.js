@@ -1,7 +1,7 @@
 // The story: six missions in a chain, each with an objective marker in the world, on
 // the minimap and in the HUD. Completing one pays out and starts the next.
 import * as THREE from '../vendor/three.module.min.js';
-import { CAR_OWNERS, MISSIONS } from './config.js';
+import { CAR_OWNERS, JAX_CAR, MISSIONS, VANE_SUV } from './config.js';
 
 function createBeacon(scene) {
   const group = new THREE.Group();
@@ -75,11 +75,16 @@ export function createMissions(city, scene, traffic, audio, hooks) {
     if (m.kind === 'driveTo') setTarget(m.at.x, m.at.z);
     else if (m.kind === 'pickup') setTarget(m.at.x, m.at.z);
     else if (m.kind === 'stealDeliver') {
-      // The Comet GT waits by the beach road — the mayor's convertible, dashcam and all.
-      cometCar = traffic.spawnParked({ x: m.at.x, z: m.at.z, heading: Math.PI / 2, color: 0xff7a1a, sport: true, owner: CAR_OWNERS[7] });
+      // The story car waits at the marker — Jax's Comet or Vane's armoured SUV.
+      const owner = m.spawnOwner === 'vane' ? VANE_SUV : m.spawnOwner === 'jax' ? JAX_CAR : CAR_OWNERS[7];
+      cometCar = traffic.spawnParked({ x: m.at.x, z: m.at.z, heading: Math.PI / 2, color: m.spawnColor ?? 0xff7a1a, sport: m.spawnSport ?? true, owner });
       setTarget(m.at.x, m.at.z);
     } else if (m.kind === 'combat') setTarget(m.at.x, m.at.z);
-    else if (m.kind === 'escape') {
+    else if (m.kind === 'escort') {
+      // Dead Air: the broadcast van needs three relay zones, and the PD knows it.
+      hooks.setWanted(4);
+      setTarget(m.at.x, m.at.z);
+    } else if (m.kind === 'escape') {
       hooks.setWanted(3);
       setTarget(m.at.x, m.at.z);
     } else if (m.kind === 'robbery') setTarget(m.at.x, m.at.z);
@@ -88,8 +93,9 @@ export function createMissions(city, scene, traffic, audio, hooks) {
   function completeMission(player) {
     const m = current();
     player.money += m.reward;
+    player.rep = (player.rep || 0) + (m.rep || 0);
     audio.cash();
-    hooks.onMissionComplete(m, m.reward);
+    hooks.onMissionComplete(m, m.reward, m.rep || 0);
     beacon.hide();
     target = null;
     index += 1;
@@ -163,7 +169,7 @@ export function createMissions(city, scene, traffic, audio, hooks) {
         if (phase === 0) {
           if (player.inCar && near(m.at, 9)) {
             phase = 1;
-            hooks.onToast('Maya hops in. "Docks. Step on it."');
+            hooks.onToast(m.pickupToast || 'They hop in. "Go. Now."');
             audio.pickup();
             setTarget(m.at2.x, m.at2.z);
           }
@@ -174,8 +180,8 @@ export function createMissions(city, scene, traffic, audio, hooks) {
         if (phase === 0) {
           if (player.inCar && player.car === cometCar) {
             phase = 1;
-            hooks.setWanted(2);
-            hooks.onToast('The Comet GT is yours — and its dashcam proves the setup. Lose the cops, get it to Ray\'s garage.');
+            hooks.setWanted(m.wantedOnSteal ?? 2);
+            hooks.onToast(m.stealToast || 'Got it. Now get it where it needs to go.');
             setTarget(m.at2.x, m.at2.z);
           }
         } else if (player.inCar && player.car === cometCar && near(m.at2, 9)) {
@@ -185,18 +191,35 @@ export function createMissions(city, scene, traffic, audio, hooks) {
         if (phase === 0) {
           if (!player.inCar && near(m.at, 34)) {
             phase = 1;
-            hooks.onToast('Ambush! Take down the Harbormaster\'s crew.');
+            hooks.onToast(m.ambushToast || 'Ambush! Take them down.');
             ctx.spawnCrew(m.at.x, m.at.z);
             crewSpawned = true;
           }
         } else if (phase === 1) {
           if (ctx.crewAlive() === 0 && crewSpawned) {
             phase = 2;
-            hooks.onToast('Crew down. Grab the package.');
+            hooks.onToast(m.grabToast || 'Crew down. Grab it.');
             setTarget(m.at.x, m.at.z);
           }
         } else if (!player.inCar && near(m.at, 4)) {
           completeMission(player);
+        }
+      } else if (m.kind === 'escort') {
+        // Three relay zones in order; the van only uploads while the player is
+        // in a car at the relay. Phase counts the relays already hit.
+        const zones = [m.at, m.at2, m.at3];
+        const zone = zones[phase];
+        if (zone && player.inCar && near(zone, 9)) {
+          phase += 1;
+          if (phase >= zones.length) {
+            hooks.onToast('Relay 3 of 3 — Tideglass is live. The whole city just saw it.');
+            completeMission(player);
+          } else {
+            const next = zones[phase];
+            hooks.onToast(`Relay ${phase} of 3 up — Tideglass is uploading. Next relay, go!`);
+            hooks.onObjective(`Escort the broadcast van — relay ${phase + 1} of 3`);
+            setTarget(next.x, next.z);
+          }
         }
       } else if (m.kind === 'escape') {
         if (near(m.at, 30)) {

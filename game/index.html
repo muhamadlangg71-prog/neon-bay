@@ -15,6 +15,9 @@
   .panel { background: rgba(10, 10, 18, 0.55); border-radius: 6px; padding: 6px 10px; }
   #top-right { position: absolute; top: 14px; right: 16px; text-align: right; }
   #money { font-size: 26px; font-weight: 800; color: #7dff8a; text-shadow: 0 2px 4px #000; letter-spacing: 1px; }
+  #rep { font-size: 14px; font-weight: 700; color: #ffd23c; text-shadow: 0 2px 4px #000; letter-spacing: 1px; }
+  #ammo { font-size: 14px; font-weight: 700; color: #e8e4da; text-shadow: 0 2px 4px #000; letter-spacing: 1px; }
+  #ammo.low { color: #ff6060; }
   #stars { font-size: 26px; letter-spacing: 3px; color: #888; text-shadow: 0 2px 4px #000; }
   #stars.hot { color: #ffd23c; }
   #objective { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); max-width: 46vw; text-align: center; font-size: 15px; font-weight: 600; text-shadow: 0 2px 4px #000; }
@@ -64,6 +67,8 @@
 <div id="hud" class="hidden">
   <div id="top-right">
     <div id="money">$0</div>
+    <div id="rep">Rookie • 0 rep</div>
+    <div id="ammo">AMMO 12/12</div>
     <div id="stars">☆☆☆☆☆</div>
   </div>
   <div id="objective" class="panel"></div>
@@ -86,10 +91,12 @@
 <div id="screen-start" class="screen show">
   <div class="game-title">NEON<br>BAY</div>
   <div class="game-sub">SUN &nbsp;•&nbsp; SPEED &nbsp;•&nbsp; SECOND CHANCES</div>
-  <p class="story">Jax Marlowe came back to Neon Bay with nothing but a fast pair of hands and a
-  debt to the Harbormaster. Steal cars, outrun the PD, run six jobs across Downtown,
-  Palmera Beach, the Docks and Cayo Verde — and take the Big Score before the city
-  takes you.</p>
+  <p class="story">Jax Marlowe, 31, did two years for a job Silas Vane set him up to take.
+  Vane walked away clean — now he owns the port, the police chief Rhea Sorn is in
+  his pocket, and his "Clean Sweep" plan is about to flatten Old Port. Jax came
+  home with $200 and a stolen name. With Nia Torres turning wrenches and Kite
+  on the keyboards, he is going to take back his car, his shop — and the
+  Tideglass, the ledger that proves Vane framed him. Six jobs. No brakes.</p>
   <div>
     <button class="btn" id="btn-continue">CONTINUE</button>
     <button class="btn" id="btn-new">NEW GAME</button>
@@ -98,7 +105,7 @@
   <div class="controls">
     <b>WASD</b> move / drive &nbsp;•&nbsp; <b>Mouse</b> camera &nbsp;•&nbsp; <b>Shift</b> run &nbsp;•&nbsp;
     <b>E</b> enter / exit car &nbsp;•&nbsp; <b>Space</b> handbrake &nbsp;•&nbsp; <b>Click</b> shoot &nbsp;•&nbsp;
-    <b>F</b> punch &nbsp;•&nbsp; <b>Esc</b> pause &nbsp;•&nbsp; <b>M</b> mute
+    <b>R</b> reload &nbsp;•&nbsp; <b>F</b> punch &nbsp;•&nbsp; <b>Esc</b> pause &nbsp;•&nbsp; <b>M</b> mute
   </div>
 </div>
 
@@ -119,7 +126,7 @@
 
 <div id="screen-complete" class="screen">
   <div class="big-word gold">STORY COMPLETE</div>
-  <p id="complete-text">You took the Big Score and walked away clean. Neon Bay is yours now — keep driving, the city never sleeps.</p>
+  <p id="complete-text">Vane is in cuffs, Chief Sorn is charged, and the Tideglass did what two years in prison could not — it told the truth. Old Port stands, Nia\u2019s workshop is being rebuilt, and the Comet is yours again. Jax Marlowe stays. Neon Bay is home.</p>
   <button class="btn" id="btn-freeroam">KEEP PLAYING — FREE ROAM</button>
 </div>
 

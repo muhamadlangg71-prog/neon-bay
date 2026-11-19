@@ -3,6 +3,7 @@ export const ACTION_CONFIRM = 'confirm';
 export const ACTION_PAUSE = 'pause';
 export const ACTION_ENTER_CAR = 'enterCar';
 export const ACTION_PUNCH = 'punch';
+export const ACTION_RELOAD = 'reload';
 export const ACTION_HANDBRAKE = 'handbrake';
 
 export function createInput(canvas) {
@@ -17,6 +18,7 @@ export function createInput(canvas) {
   const KEY_ACTIONS = {
     KeyE: ACTION_ENTER_CAR,
     KeyF: ACTION_PUNCH,
+    KeyR: ACTION_RELOAD,
     Space: ACTION_HANDBRAKE,
     Escape: ACTION_PAUSE,
     Enter: ACTION_CONFIRM,
@@ -102,7 +104,10 @@ export function createInput(canvas) {
     lockPointer() {
       if (!locked) {
         try {
-          canvas.requestPointerLock();
+          // requestPointerLock returns a promise in Chrome; a rejected one
+          // (no user gesture yet) must not surface as an unhandled error.
+          const p = canvas.requestPointerLock();
+          if (p && p.catch) p.catch(() => {});
         } catch {
           // Pointer lock can fail (headless, iframe): the game still plays with keys.
         }

@@ -1,6 +1,8 @@
-// Combat: punch and pistol. Shots are sphere-tested against enemies, pedestrians,
-// cops and cars; a tracer line and the synth gunshot sell each round.
+// Combat: punch (three-hit combo) and pistol (limited magazine, reload with R).
+// Shots are sphere-tested against enemies, pedestrians, cops and cars; a tracer
+// line and the synth gunshot sell each round.
 import * as THREE from '../vendor/three.module.min.js';
+import { COMBAT } from './config.js';
 
 const PISTOL_DAMAGE = 34;
 const PUNCH_DAMAGE = 15;
@@ -34,6 +36,16 @@ export function createCombat(scene, random) {
   let fireCooldown = 0;
   let punchCooldown = 0;
   let wantedRaiseCooldown = 0;
+  let ammo = COMBAT.magSize;
+  let reloadTimer = 0;
+  let combo = 0;
+  let comboTimer = 0;
+
+  function startReload(audio) {
+    if (reloadTimer > 0 || ammo >= COMBAT.magSize) return;
+    reloadTimer = COMBAT.reloadSeconds;
+    if (audio) audio.reload();
+  }
 
   function spawnEnemy(x, z) {
     const mesh = createEnemyMesh();
@@ -88,6 +100,15 @@ export function createCombat(scene, random) {
 
   return {
     enemies,
+    get ammo() {
+      return ammo;
+    },
+    get magSize() {
+      return COMBAT.magSize;
+    },
+    get reloading() {
+      return reloadTimer > 0;
+    },
     spawnEnemy,
     spawnCrew(x, z) {
       const spots = [[-6, -4], [6, -6], [-4, 6], [7, 4]];
@@ -103,6 +124,15 @@ export function createCombat(scene, random) {
       fireCooldown -= dt;
       punchCooldown -= dt;
       wantedRaiseCooldown -= dt;
+      comboTimer -= dt;
+      if (comboTimer <= 0) combo = 0;
+      if (reloadTimer > 0) {
+        reloadTimer -= dt;
+        if (reloadTimer <= 0) {
+          reloadTimer = 0;
+          ammo = COMBAT.magSize;
+        }
+      }
       // Tracer fade.
       for (const t of [...tracers]) {
         t.userData.life -= dt;
@@ -112,9 +142,14 @@ export function createCombat(scene, random) {
           tracers.splice(tracers.indexOf(t), 1);
         }
       }
-      // Player punch (F): a close target in front takes damage.
+      // Player punch (F): a three-hit combo — the third hit is a heavy finisher.
       if (ctx.input.wasPressed('punch') && punchCooldown <= 0) {
         punchCooldown = 0.45;
+        combo = comboTimer > 0 ? combo + 1 : 1;
+        comboTimer = COMBAT.punchComboWindow;
+        const finisher = combo >= 3;
+        if (finisher) combo = 0;
+        const damage = finisher ? PUNCH_DAMAGE * 2 : PUNCH_DAMAGE;
         ctx.audio.punch();
         const fx = Math.sin(ctx.player.heading);
         const fz = Math.cos(ctx.player.heading);
@@ -130,7 +165,7 @@ export function createCombat(scene, random) {
           const d = Math.hypot(dx, dz);
           if (d < 2.4 && (dx * fx + dz * fz) / (d || 1) > 0.4) {
             if (h.kind === 'enemy') {
-              h.ref.health -= PUNCH_DAMAGE;
+              h.ref.health -= damage;
               ctx.audio.hit();
               if (h.ref.health <= 0) removeEnemy(h.ref);
             } else if (h.kind === 'cop') {
@@ -144,9 +179,18 @@ export function createCombat(scene, random) {
           }
         }
       }
+      // Reload (R), or automatically when the magazine runs dry.
+      if (ctx.input.wasPressed('reload')) startReload(ctx.audio);
       // Player pistol: mouse click fires from the camera toward its forward ray.
       if (ctx.input.shootClicked() && fireCooldown <= 0 && ctx.screen === 'play') {
-        fireCooldown = FIRE_INTERVAL;
+        if (reloadTimer > 0) {
+          // Mid-reload: the trigger does nothing.
+        } else if (ammo <= 0) {
+          ctx.audio.click();
+          startReload(ctx.audio);
+        } else {
+          ammo -= 1;
+          fireCooldown = FIRE_INTERVAL;
         const origin = ctx.shootOrigin;
         const dir = ctx.shootDir;
         const targets = [];
@@ -189,6 +233,7 @@ export function createCombat(scene, random) {
               }
             }
           }
+        }
         }
       }
       // Enemies: close in and shoot at the player.

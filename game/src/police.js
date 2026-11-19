@@ -10,6 +10,43 @@ export function createPolice(city, scene, random) {
   let hiddenTime = 0;
   let spawnCooldown = 0;
   let sirenOn = false;
+  let heliAngle = 0;
+
+  /** Tracker helicopter: circles the player once the heat hits 4 stars. */
+  function createHeliMesh() {
+    const g = new THREE.Group();
+    const navy = new THREE.MeshLambertMaterial({ color: 0x8a94b8 });
+    const white = new THREE.MeshLambertMaterial({ color: 0xe8e4da });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.1, 3.4), navy);
+    body.position.y = 0;
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.25, 3.45), white);
+    stripe.position.y = 0.2;
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 3.2), navy);
+    tail.position.set(0, 0.2, -3);
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.1, 0.8), navy);
+    fin.position.set(0, 0.7, -4.4);
+    const rotor = new THREE.Mesh(new THREE.BoxGeometry(9, 0.08, 0.5), new THREE.MeshLambertMaterial({ color: 0x111318 }));
+    rotor.position.y = 0.85;
+    const skidL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 2.6), new THREE.MeshLambertMaterial({ color: 0x111318 }));
+    skidL.position.set(-0.9, -0.8, 0);
+    const skidR = skidL.clone();
+    skidR.position.x = 0.9;
+    // Searchlight cone: apex at the heli, wide end on the street below.
+    const cone = new THREE.Mesh(
+      new THREE.ConeGeometry(7, 30, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0.10, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    cone.rotation.x = Math.PI;
+    cone.position.y = -15;
+    g.add(body, stripe, tail, fin, rotor, skidL, skidR, cone);
+    g.traverse((m) => { m.castShadow = false; });
+    g.visible = false;
+    g.userData.rotor = rotor;
+    scene.add(g);
+    return g;
+  }
+
+  const heli = { mesh: createHeliMesh(), x: 0, z: 0 };
 
   function spawnCarNear(px, pz) {
     // A road point on a ring around the player.
@@ -97,6 +134,22 @@ export function createPolice(city, scene, random) {
     get sirenOn() {
       return sirenOn;
     },
+    /** True while the tracker helicopter is up (wanted 4-5). */
+    get heliActive() {
+      return wanted >= 4;
+    },
+    /** Point the helicopter's orbit at a given angle (screenshot staging). */
+    setHeliAngle(a) {
+      heliAngle = a;
+    },
+    /** Ground position of the helicopter, for the minimap; null when grounded. */
+    get heliPos() {
+      return wanted >= 4 ? { x: heli.x, z: heli.z } : null;
+    },
+    /** True when the player has been out of sight for a while. */
+    get isHidden() {
+      return wanted > 0 && hiddenTime > 2;
+    },
     addWanted(n) {
       wanted = Math.max(0, Math.min(5, wanted + n));
       hiddenTime = 0;
@@ -104,12 +157,14 @@ export function createPolice(city, scene, random) {
     clearWanted() {
       wanted = 0;
       hiddenTime = 0;
+      heli.mesh.visible = false;
       for (const u of [...units]) removeUnit(u);
     },
     reset() {
       wanted = 0;
       hiddenTime = 0;
       spawnCooldown = 0;
+      heli.mesh.visible = false;
       for (const u of [...units]) removeUnit(u);
     },
     update(dt, player, onBusted) {
@@ -136,10 +191,23 @@ export function createPolice(city, scene, random) {
       }
       sirenOn = units.length > 0;
 
+      // Tracker helicopter: circles high above the player at 4-5 stars, and its
+      // spotlight makes the heat cool down much slower while it is up.
+      const heliActive = wanted >= 4;
+      heli.mesh.visible = heliActive;
+      if (heliActive) {
+        heliAngle += dt * 0.3;
+        heli.x = px + Math.cos(heliAngle) * 42;
+        heli.z = pz + Math.sin(heliAngle) * 42;
+        heli.mesh.position.set(heli.x, 24, heli.z);
+        heli.mesh.rotation.y = Math.atan2(px - heli.x, pz - heli.z);
+        heli.mesh.userData.rotor.rotation.y += dt * 22;
+      }
+
       // Heat decay: hidden from every unit for a while drops one star.
       if (wanted > 0) {
         if (!nearestSeen(px, pz)) {
-          hiddenTime += dt;
+          hiddenTime += dt * (heliActive ? 0.35 : 1);
           if (hiddenTime > WANTED.decaySeconds[wanted]) {
             wanted -= 1;
             hiddenTime = 0;
