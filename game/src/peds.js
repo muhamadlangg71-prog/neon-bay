@@ -113,7 +113,7 @@ export function createPeds(city, scene, random) {
      *  circle for a while (buskers, tourists, an argument), then drift back to walking.
      *  Returns the event's label for the radio/toast, or null when nothing staged. */
     startStreetEvent(px, pz) {
-      const event = STREET_EVENTS[random.int(0, STREET_EVENTS.length - 1)];
+      const event = random.pick(STREET_EVENTS);
       // A sidewalk point 35-70 units from the player, so it is near but off-camera.
       const a = random.range(0, Math.PI * 2);
       const r = random.range(35, 70);

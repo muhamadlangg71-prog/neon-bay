@@ -231,6 +231,8 @@ export function buildCity(scene, random) {
         const z0 = bz * STEP + 7;
         const x1 = (bx + 1) * STEP - 7;
         const z1 = (bz + 1) * STEP - 7;
+        // Skip blocks too small to hold a building.
+        if (x1 - x0 < 20 || z1 - z0 < 20) continue;
         // Beach strip and docks strip get no buildings.
         if (x0 >= 208 || z0 >= 208) continue;
         const downtown = Math.abs(bx) <= 2 && Math.abs(bz) <= 2;

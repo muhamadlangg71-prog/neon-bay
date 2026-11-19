@@ -63,6 +63,7 @@ export const WANTED = {
 
 // The story (design: six missions, three acts). `at` is the objective point;
 // `kind` drives the rules in missions.js. `rep` is reputation on completion.
+// Totals: $87,500 and 3,150 rep across all six missions.
 function mission(id, title, brief, objective, at, kind, reward, rep, extra = {}) {
   return { id, title, brief, objective, at, kind, reward, rep, ...extra };
 }

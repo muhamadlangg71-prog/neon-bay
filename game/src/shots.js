@@ -21,6 +21,7 @@ function putPlayerInCar(g, car, x, z, heading, speed) {
   player.z = z;
   player.heading = heading;
   player.camYaw = heading;
+  player.camPitch = 0.3;
   playerMesh.visible = false;
 }
 

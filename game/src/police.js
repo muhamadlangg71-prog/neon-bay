@@ -209,6 +209,29 @@ export function createPolice(city, scene, random) {
     u.mesh.rotation.x = Math.sin(u.walkPhase) * 0.06;
   }
 
+  // Police cars keep their distance from each other.
+  function separateCars() {
+    for (let i = 0; i < units.length; i += 1) {
+      for (let j = i + 1; j < units.length; j += 1) {
+        const a = units[i];
+        const b = units[j];
+        if (a.kind !== 'car' || b.kind !== 'car') continue;
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const d = Math.hypot(dx, dz);
+        if (d < 7 && d > 0.01) {
+          const push = (7 - d) / 2;
+          const nx = dx / d;
+          const nz = dz / d;
+          a.x -= nx * push;
+          a.z -= nz * push;
+          b.x += nx * push;
+          b.z += nz * push;
+        }
+      }
+    }
+  }
+
   return {
     get wanted() {
       return wanted;
@@ -310,26 +333,7 @@ export function createPolice(city, scene, random) {
         if (u.kind === 'car') chaseCar(u, dt, player);
         else chaseCop(u, dt, player, onBusted);
       }
-      // Police cars keep their distance from each other.
-      for (let i = 0; i < units.length; i += 1) {
-        for (let j = i + 1; j < units.length; j += 1) {
-          const a = units[i];
-          const b = units[j];
-          if (a.kind !== 'car' || b.kind !== 'car') continue;
-          const dx = b.x - a.x;
-          const dz = b.z - a.z;
-          const d = Math.hypot(dx, dz);
-          if (d < 7 && d > 0.01) {
-            const push = (7 - d) / 2;
-            const nx = dx / d;
-            const nz = dz / d;
-            a.x -= nx * push;
-            a.z -= nz * push;
-            b.x += nx * push;
-            b.z += nz * push;
-          }
-        }
-      }
+      separateCars();
     },
   };
 }

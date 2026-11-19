@@ -1,5 +1,6 @@
 // The HUD: health, money, wanted stars, objective line, minimap, toasts and menus.
 // All DOM lives in index.html; this module only drives it.
+import { WORLD } from './config.js';
 export function createHud(doc) {
   const $ = (id) => doc.getElementById(id);
   const healthFill = $('health-fill');
@@ -114,7 +115,7 @@ export function createHud(doc) {
       mctx.strokeStyle = '#6a6e78';
       mctx.lineWidth = 2;
       for (let i = -5; i <= 5; i += 1) {
-        const p = i * 52;
+        const p = i * WORLD.block;
         mctx.beginPath();
         mctx.moveTo(px(p), py(-260));
         mctx.lineTo(px(p), py(260));

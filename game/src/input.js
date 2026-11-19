@@ -106,6 +106,9 @@ export function createInput(canvas) {
     },
     lockPointer() {
       if (locked) return;
+      // A click queued on the title screen (e.g. on NEW GAME) must not fire the
+      // pistol the moment play starts.
+      clickQueued = false;
       try {
         // requestPointerLock returns a promise in Chrome; a rejected one (no
         // user gesture yet) must not surface as an unhandled error.

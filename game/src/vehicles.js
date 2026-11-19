@@ -58,6 +58,11 @@ export function createCarMesh(color, opts = {}) {
   return g;
 }
 
+function spinWheels(mesh, speed, dt) {
+  const spin = (speed / 0.38) * dt;
+  for (const w of mesh.userData.wheels) w.rotation.x += spin;
+}
+
 function edgeLength(nodes, a, b) {
   return Math.hypot(nodes[b].x - nodes[a].x, nodes[b].z - nodes[a].z);
 }
@@ -131,8 +136,7 @@ export function createTraffic(city, scene, random) {
     car.heading = car.dir > 0 ? Math.atan2(b.x - a.x, b.z - a.z) : Math.atan2(a.x - b.x, a.z - b.z);
     car.mesh.position.set(car.x, 0, car.z);
     car.mesh.rotation.y = car.heading;
-    const spin = (car.speed / 0.38) * 0.016;
-    for (const w of car.mesh.userData.wheels) w.rotation.x += spin;
+    spinWheels(car.mesh, car.speed, 0.016);
   }
 
   // How fast may this car go, given the car ahead of it (if any)?
@@ -275,6 +279,5 @@ export function drivePlayerCar(car, input, dt, city) {
   car.mesh.rotation.y = car.heading;
   // Body roll and wheel spin sell the speed.
   car.mesh.rotation.z = -steer * Math.min(0.06, Math.abs(car.speed) * 0.0016);
-  const spin = (car.speed / 0.38) * dt;
-  for (const w of car.mesh.userData.wheels) w.rotation.x += spin;
+  spinWheels(car.mesh, car.speed, dt);
 }

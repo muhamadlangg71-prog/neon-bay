@@ -20,7 +20,7 @@ export function createRandom(seed) {
       return Math.floor(min + next() * (max - min + 1));
     },
     pick(list) {
-      return list[Math.floor(next() * list.length)];
+      return list[this.int(0, list.length - 1)];
     },
   };
 }

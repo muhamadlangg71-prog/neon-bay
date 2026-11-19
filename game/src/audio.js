@@ -81,7 +81,8 @@ export function createAudio() {
     const step = 0.22;
     const start = ctx.currentTime + 0.05;
     for (let i = 0; i < 8; i += 1) {
-      const freq = BASS[(bar * 8 + i) % BASS.length];
+      // BASS has exactly 8 steps, so the bar index is just i.
+      const freq = BASS[i];
       if (freq) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();

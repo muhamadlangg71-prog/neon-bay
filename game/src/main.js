@@ -4,7 +4,7 @@
 import * as THREE from '../vendor/three.module.min.js';
 import { PLAYER, SAVE_KEY, STEP, WORLD, districtAt, rankForRep } from './config.js';
 import { createRandom } from './random.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
+import { ACTION_PAUSE, createInput } from './input.js';
 import { buildCity } from './city.js';
 import { createCarMesh, createTraffic, drivePlayerCar } from './vehicles.js';
 import { createPeds } from './peds.js';

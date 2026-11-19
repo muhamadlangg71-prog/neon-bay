@@ -174,20 +174,20 @@ export function createMissions(city, scene, traffic, audio, hooks) {
         }
       }
     },
-    escape(m, player) {
+    escape(m, player, ctx, dt) {
       if (near(player, m.at, 30)) {
         // On the island the heat dies faster: the PD cannot follow forever.
-        phaseTimer += dtOf(m) * 2;
+        phaseTimer += dt * 2;
         if (phaseTimer > 14) {
           hooks.setWanted(0);
           completeMission(player);
         }
       }
     },
-    robbery(m, player) {
+    robbery(m, player, ctx, dt) {
       if (phase === 0) {
         if (!player.inCar && near(player, m.at, 7)) {
-          holdTimer += dtOf(m);
+          holdTimer += dt;
           hooks.onHold(holdTimer / 5);
           if (holdTimer >= 5) {
             phase = 1;
@@ -197,7 +197,7 @@ export function createMissions(city, scene, traffic, audio, hooks) {
             setTarget(m.at2.x, m.at2.z);
           }
         } else {
-          holdTimer = Math.max(0, holdTimer - dtOf(m) * 2);
+          holdTimer = Math.max(0, holdTimer - dt * 2);
           hooks.onHold(holdTimer / 5);
         }
       } else if (near(player, m.at2, 9)) {
@@ -206,11 +206,6 @@ export function createMissions(city, scene, traffic, audio, hooks) {
     },
   };
 
-  // The rules read the step length through this holder (set in update).
-  let stepDt = 0;
-  function dtOf() {
-    return stepDt;
-  }
   function near(player, point, radius) {
     return Math.hypot(player.x - point.x, player.z - point.z) < radius;
   }
@@ -256,7 +251,6 @@ export function createMissions(city, scene, traffic, audio, hooks) {
       }
     },
     update(dt, time, player, ctx) {
-      stepDt = dt;
       beacon.update(dt, time);
       if (startDelay > 0) {
         startDelay -= dt;
@@ -267,7 +261,7 @@ export function createMissions(city, scene, traffic, audio, hooks) {
       if (!m) return;
       phaseTimer += dt;
       const rule = rules[m.kind];
-      if (rule) rule(m, player, ctx);
+      if (rule) rule(m, player, ctx, dt);
     },
   };
 }

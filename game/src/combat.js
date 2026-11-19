@@ -67,14 +67,15 @@ export function createCombat(scene, random) {
     let best = null;
     let bestT = PISTOL_RANGE;
     for (const t of targets) {
-      const cy = (t.y ?? 1.2) - origin.y;
+      const ty = t.y ?? 1.2;
+      const cy = ty - origin.y;
       const proj = (t.x - origin.x) * dir.x + cy * dir.y + (t.z - origin.z) * dir.z;
       if (proj < 0 || proj > bestT) continue;
       const px = origin.x + dir.x * proj;
       const py = origin.y + dir.y * proj;
       const pz = origin.z + dir.z * proj;
       const dx = t.x - px;
-      const dy = (t.y ?? 1.2) - py;
+      const dy = ty - py;
       const dz = t.z - pz;
       if (dx * dx + dy * dy + dz * dz < t.radius * t.radius) {
         bestT = proj;
