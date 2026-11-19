@@ -62,10 +62,49 @@ export function createPeds(city, scene, random) {
 
   for (let i = 0; i < PEDS.count; i += 1) spawn();
 
-  function pickTarget(ped) {
-    // Walk to a nearby sidewalk point; prefer staying on the same street.
-    const p = randomSidewalkPoint();
-    ped.target = p;
+  // One walking step toward the target; returns false when the ped is idle.
+  function walkStep(ped, dt) {
+    if (ped.wait > 0) {
+      ped.wait -= dt;
+      return false;
+    }
+    if (!ped.target) ped.target = randomSidewalkPoint();
+    if (ped.flee > 0) ped.flee -= dt;
+    const dx = ped.target.x - ped.x;
+    const dz = ped.target.z - ped.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist < 1.5) {
+      if (ped.flee > 0) {
+        ped.flee = 0;
+        ped.target = null;
+      } else {
+        ped.target = null;
+        ped.wait = random.range(1, 5);
+      }
+      return false;
+    }
+    const speed = ped.flee > 0 ? 5.5 : ped.speed;
+    const wantHeading = Math.atan2(dx, dz);
+    let dh = wantHeading - ped.heading;
+    while (dh > Math.PI) dh -= Math.PI * 2;
+    while (dh < -Math.PI) dh += Math.PI * 2;
+    ped.heading += Math.max(-3 * dt, Math.min(3 * dt, dh));
+    ped.x += Math.sin(ped.heading) * speed * dt;
+    ped.z += Math.cos(ped.heading) * speed * dt;
+    ped.x = Math.max(-HALF, Math.min(HALF, ped.x));
+    ped.z = Math.max(-HALF, Math.min(HALF, ped.z));
+    const pos = { x: ped.x, z: ped.z };
+    city.collideCircle(pos, 0.5);
+    ped.x = pos.x;
+    ped.z = pos.z;
+    ped.mesh.position.set(ped.x, 0, ped.z);
+    ped.mesh.rotation.y = ped.heading;
+    // Walk-cycle arm swing.
+    ped.walkPhase += dt * speed * 3.2;
+    const swing = Math.sin(ped.walkPhase) * 0.5;
+    ped.mesh.userData.armL.rotation.x = swing;
+    ped.mesh.userData.armR.rotation.x = -swing;
+    return true;
   }
 
   return {
@@ -127,48 +166,7 @@ export function createPeds(city, scene, random) {
           // Stand in the circle and watch until the moment passes.
           if (!ped.target) ped.wait = Math.max(ped.wait, 0.6);
         }
-        if (ped.wait > 0) {
-          ped.wait -= dt;
-          continue;
-        }
-        if (!ped.target || ped.flee <= 0) {
-          if (!ped.target) pickTarget(ped);
-        }
-        if (ped.flee > 0) ped.flee -= dt;
-        const dx = ped.target.x - ped.x;
-        const dz = ped.target.z - ped.z;
-        const dist = Math.hypot(dx, dz);
-        if (dist < 1.5) {
-          if (ped.flee > 0) {
-            ped.flee = 0;
-            ped.target = null;
-          } else {
-            ped.target = null;
-            ped.wait = random.range(1, 5);
-          }
-          continue;
-        }
-        const speed = ped.flee > 0 ? 5.5 : ped.speed;
-        const wantHeading = Math.atan2(dx, dz);
-        let dh = wantHeading - ped.heading;
-        while (dh > Math.PI) dh -= Math.PI * 2;
-        while (dh < -Math.PI) dh += Math.PI * 2;
-        ped.heading += Math.max(-3 * dt, Math.min(3 * dt, dh));
-        ped.x += Math.sin(ped.heading) * speed * dt;
-        ped.z += Math.cos(ped.heading) * speed * dt;
-        ped.x = Math.max(-HALF, Math.min(HALF, ped.x));
-        ped.z = Math.max(-HALF, Math.min(HALF, ped.z));
-        const pos = { x: ped.x, z: ped.z };
-        city.collideCircle(pos, 0.5);
-        ped.x = pos.x;
-        ped.z = pos.z;
-        ped.mesh.position.set(ped.x, 0, ped.z);
-        ped.mesh.rotation.y = ped.heading;
-        // Walk-cycle arm swing.
-        ped.walkPhase += dt * speed * 3.2;
-        const swing = Math.sin(ped.walkPhase) * 0.5;
-        ped.mesh.userData.armL.rotation.x = swing;
-        ped.mesh.userData.armR.rotation.x = -swing;
+        walkStep(ped, dt);
       }
     },
   };

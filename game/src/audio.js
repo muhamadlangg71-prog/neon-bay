@@ -1,5 +1,5 @@
-// Synthesised sound: every sound is built with WebAudio oscillators and filtered noise,
-// so the game ships no audio files at all.
+// Synthesised sound: every sound is built with WebAudio oscillators and filtered
+// noise, so the game ships no audio files at all.
 export function createAudio() {
   let ctx = null;
   let master = null;
@@ -37,9 +37,10 @@ export function createAudio() {
     return buffer;
   }
 
-  function blip(freq, dur, type, vol, slideTo) {
+  // One short oscillator note with a decaying envelope; `slideTo` glides the pitch.
+  function tone(freq, dur, type, vol, slideTo, delay = 0) {
     if (!ensure() || muted) return;
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + delay;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = type || 'square';
@@ -53,9 +54,10 @@ export function createAudio() {
     osc.stop(t + dur + 0.02);
   }
 
-  function noiseBurst(dur, vol, filterFreq) {
+  // One burst of filtered noise with a decaying envelope.
+  function noiseHit(dur, vol, filterFreq, delay = 0) {
     if (!ensure() || muted) return;
-    const t = ctx.currentTime;
+    const t = ctx.currentTime + delay;
     const src = ctx.createBufferSource();
     src.buffer = noiseBuffer(dur);
     const filter = ctx.createBiquadFilter();
@@ -114,39 +116,39 @@ export function createAudio() {
       ensure();
     },
     shoot() {
-      noiseBurst(0.12, 0.5, 2500);
-      blip(180, 0.08, 'sawtooth', 0.12, 60);
+      noiseHit(0.12, 0.5, 2500);
+      tone(180, 0.08, 'sawtooth', 0.12, 60);
     },
     punch() {
-      noiseBurst(0.08, 0.3, 500);
+      noiseHit(0.08, 0.3, 500);
     },
     hit() {
-      blip(140, 0.12, 'sawtooth', 0.2, 70);
+      tone(140, 0.12, 'sawtooth', 0.2, 70);
     },
     pickup() {
-      blip(660, 0.09, 'sine', 0.18);
-      setTimeout(() => blip(990, 0.12, 'sine', 0.18), 90);
+      tone(660, 0.09, 'sine', 0.18);
+      tone(990, 0.12, 'sine', 0.18, null, 0.09);
     },
     cash() {
-      blip(880, 0.08, 'sine', 0.16);
-      setTimeout(() => blip(1174, 0.08, 'sine', 0.16), 80);
-      setTimeout(() => blip(1568, 0.16, 'sine', 0.16), 160);
+      tone(880, 0.08, 'sine', 0.16);
+      tone(1174, 0.08, 'sine', 0.16, null, 0.08);
+      tone(1568, 0.16, 'sine', 0.16, null, 0.16);
     },
     mission() {
-      blip(523, 0.12, 'triangle', 0.2);
-      setTimeout(() => blip(659, 0.12, 'triangle', 0.2), 120);
-      setTimeout(() => blip(784, 0.22, 'triangle', 0.22), 240);
+      tone(523, 0.12, 'triangle', 0.2);
+      tone(659, 0.12, 'triangle', 0.2, null, 0.12);
+      tone(784, 0.22, 'triangle', 0.22, null, 0.24);
     },
     fail() {
-      blip(220, 0.25, 'sawtooth', 0.18, 110);
+      tone(220, 0.25, 'sawtooth', 0.18, 110);
     },
     click() {
-      blip(700, 0.05, 'square', 0.1);
+      tone(700, 0.05, 'square', 0.1);
     },
     reload() {
       // Magazine out, magazine in: two short metallic clicks.
-      noiseBurst(0.05, 0.25, 3000);
-      setTimeout(() => noiseBurst(0.06, 0.3, 1800), 220);
+      noiseHit(0.05, 0.25, 3000);
+      noiseHit(0.06, 0.3, 1800, 0.22);
     },
     startWaves() {
       // Gentle surf: looping noise through a low-pass, swell driven by an LFO.
@@ -173,7 +175,7 @@ export function createAudio() {
       lfo.start();
     },
     crash() {
-      noiseBurst(0.25, 0.4, 800);
+      noiseHit(0.25, 0.4, 800);
     },
     engine(on, speed01) {
       if (!ensure() || muted) return;

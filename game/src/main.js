@@ -128,10 +128,6 @@ let paused = false;
 let muted = false;
 let eventTimer = 40; // the street-event director fires roughly every 45 seconds.
 
-function announce(msg) {
-  statusEl.textContent = msg;
-}
-
 // --- Land / water rules ---------------------------------------------------------
 function clampToLand(pos) {
   pos.x = Math.max(-262, Math.min(262, pos.x));
@@ -534,7 +530,6 @@ document.getElementById('btn-resume').addEventListener('click', () => {
 });
 document.getElementById('btn-restart-mission').addEventListener('click', () => {
   audio.click();
-  const idx = Math.max(0, missions.index);
   missions.reset();
   police.reset();
   combat.clearEnemies();
@@ -547,9 +542,8 @@ document.getElementById('btn-restart-mission').addEventListener('click', () => {
   player.x = 0;
   player.z = 26;
   player.health = PLAYER.maxHealth;
-  missions.startStory();
   // Restarting replays from mission 1; the story is short enough to replay.
-  void idx;
+  missions.startStory();
   resumeGame();
 });
 document.getElementById('btn-save-quit').addEventListener('click', () => {

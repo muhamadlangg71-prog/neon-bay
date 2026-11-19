@@ -38,12 +38,9 @@ function putPlayerOnFoot(g, x, z, heading) {
   playerMesh.rotation.y = heading;
 }
 
-/**
- * Stage the named scene and return { shot, settleSteps, note }.
- * Any other name stages the walk scene.
- */
-export function stageShot(name, g) {
-  const { player, police, missions, combat, traffic } = g;
+// Common reset before any scene: a clean, healthy, lightly-funded Jax.
+function resetStage(g) {
+  const { player, police, missions, combat } = g;
   police.reset();
   combat.clearEnemies();
   missions.reset();
@@ -52,6 +49,15 @@ export function stageShot(name, g) {
   player.inCar = false;
   player.car = null;
   player.speed = 0;
+}
+
+/**
+ * Stage the named scene and return { shot, settleSteps, note }.
+ * Any other name stages the walk scene.
+ */
+export function stageShot(name, g) {
+  const { player, police, missions, traffic } = g;
+  resetStage(g);
 
   if (name === 'chase') {
     // Mission 6, Last Exit: five stars, your stolen Comet ahead on the marina

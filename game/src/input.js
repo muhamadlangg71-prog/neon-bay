@@ -1,4 +1,5 @@
-// Keyboard + mouse (pointer lock) input. Actions are named; the game reads them each step.
+// Keyboard + mouse (pointer lock) input. The game reads named actions each step,
+// never raw key codes — so the controls are one table, not scattered checks.
 export const ACTION_CONFIRM = 'confirm';
 export const ACTION_PAUSE = 'pause';
 export const ACTION_ENTER_CAR = 'enterCar';
@@ -6,47 +7,49 @@ export const ACTION_PUNCH = 'punch';
 export const ACTION_RELOAD = 'reload';
 export const ACTION_HANDBRAKE = 'handbrake';
 
-export function createInput(canvas) {
-  const keys = new Set();
-  const pressed = new Set();
-  let mouseDX = 0;
-  let mouseDY = 0;
-  let mouseDown = false;
-  let mouseClicked = false;
-  let locked = false;
+const KEY_TO_ACTION = {
+  KeyE: ACTION_ENTER_CAR,
+  KeyF: ACTION_PUNCH,
+  KeyR: ACTION_RELOAD,
+  Space: ACTION_HANDBRAKE,
+  Escape: ACTION_PAUSE,
+  Enter: ACTION_CONFIRM,
+};
 
-  const KEY_ACTIONS = {
-    KeyE: ACTION_ENTER_CAR,
-    KeyF: ACTION_PUNCH,
-    KeyR: ACTION_RELOAD,
-    Space: ACTION_HANDBRAKE,
-    Escape: ACTION_PAUSE,
-    Enter: ACTION_CONFIRM,
-  };
+// Keys whose browser default (scroll, etc.) would fight the game.
+const SWALLOW = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+
+export function createInput(canvas) {
+  const held = new Set();
+  const tapped = new Set();
+  let lookX = 0;
+  let lookY = 0;
+  let mouseHeld = false;
+  let clickQueued = false;
+  let locked = false;
 
   function onKeyDown(event) {
     if (event.repeat) return;
-    keys.add(event.code);
-    const action = KEY_ACTIONS[event.code];
-    if (action) pressed.add(action);
-    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+    held.add(event.code);
+    const action = KEY_TO_ACTION[event.code];
+    if (action) tapped.add(action);
+    if (SWALLOW.has(event.code)) event.preventDefault();
   }
   function onKeyUp(event) {
-    keys.delete(event.code);
+    held.delete(event.code);
   }
   function onMouseMove(event) {
     if (!locked) return;
-    mouseDX += event.movementX || 0;
-    mouseDY += event.movementY || 0;
+    lookX += event.movementX || 0;
+    lookY += event.movementY || 0;
   }
   function onMouseDown(event) {
-    if (event.button === 0) {
-      mouseDown = true;
-      mouseClicked = true;
-    }
+    if (event.button !== 0) return;
+    mouseHeld = true;
+    clickQueued = true;
   }
   function onMouseUp(event) {
-    if (event.button === 0) mouseDown = false;
+    if (event.button === 0) mouseHeld = false;
   }
   function onLockChange() {
     locked = document.pointerLockElement === canvas;
@@ -59,58 +62,57 @@ export function createInput(canvas) {
   window.addEventListener('mouseup', onMouseUp);
   document.addEventListener('pointerlockchange', onLockChange);
 
-  const ACTION_KEYS = {};
-  for (const [code, action] of Object.entries(KEY_ACTIONS)) ACTION_KEYS[action] = code;
+  const ACTION_TO_KEY = {};
+  for (const [code, action] of Object.entries(KEY_TO_ACTION)) ACTION_TO_KEY[action] = code;
 
   return {
     /** Held movement keys as -1/0/1 (x: strafe right, y: forward). */
     move() {
-      const x = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
-      const y = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0);
+      const x = (held.has('KeyD') || held.has('ArrowRight') ? 1 : 0) - (held.has('KeyA') || held.has('ArrowLeft') ? 1 : 0);
+      const y = (held.has('KeyW') || held.has('ArrowUp') ? 1 : 0) - (held.has('KeyS') || held.has('ArrowDown') ? 1 : 0);
       return { x, y };
     },
     run() {
-      return keys.has('ShiftLeft') || keys.has('ShiftRight');
+      return held.has('ShiftLeft') || held.has('ShiftRight');
     },
     /** Mouse delta since the last read; reading clears it. */
     look() {
-      const d = { x: mouseDX, y: mouseDY };
-      mouseDX = 0;
-      mouseDY = 0;
+      const d = { x: lookX, y: lookY };
+      lookX = 0;
+      lookY = 0;
       return d;
     },
     shootHeld() {
-      return mouseDown;
+      return mouseHeld;
     },
     shootClicked() {
-      const c = mouseClicked;
-      mouseClicked = false;
+      const c = clickQueued;
+      clickQueued = false;
       return c;
     },
     /** True once when the action's key was pressed; reading clears it. */
     wasPressed(action) {
-      const hit = pressed.has(action);
-      pressed.delete(action);
+      const hit = tapped.has(action);
+      tapped.delete(action);
       return hit;
     },
     /** True while the action's key is held down. */
     isHeld(action) {
-      const code = ACTION_KEYS[action];
-      return code ? keys.has(code) : false;
+      const code = ACTION_TO_KEY[action];
+      return code ? held.has(code) : false;
     },
     clearPressed() {
-      pressed.clear();
+      tapped.clear();
     },
     lockPointer() {
-      if (!locked) {
-        try {
-          // requestPointerLock returns a promise in Chrome; a rejected one
-          // (no user gesture yet) must not surface as an unhandled error.
-          const p = canvas.requestPointerLock();
-          if (p && p.catch) p.catch(() => {});
-        } catch {
-          // Pointer lock can fail (headless, iframe): the game still plays with keys.
-        }
+      if (locked) return;
+      try {
+        // requestPointerLock returns a promise in Chrome; a rejected one (no
+        // user gesture yet) must not surface as an unhandled error.
+        const p = canvas.requestPointerLock();
+        if (p && p.catch) p.catch(() => {});
+      } catch {
+        // Pointer lock can fail (headless, iframe): the game still plays with keys.
       }
     },
     unlockPointer() {

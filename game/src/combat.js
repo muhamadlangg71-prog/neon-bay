@@ -67,10 +67,8 @@ export function createCombat(scene, random) {
     let best = null;
     let bestT = PISTOL_RANGE;
     for (const t of targets) {
-      const cx = t.x - origin.x;
       const cy = (t.y ?? 1.2) - origin.y;
-      const cz = t.z - origin.z;
-      const proj = cx * dir.x + cy * dir.y + cz * dir.z;
+      const proj = (t.x - origin.x) * dir.x + cy * dir.y + (t.z - origin.z) * dir.z;
       if (proj < 0 || proj > bestT) continue;
       const px = origin.x + dir.x * proj;
       const py = origin.y + dir.y * proj;
@@ -96,6 +94,139 @@ export function createCombat(scene, random) {
     mesh.userData.life = 0.07;
     scene.add(mesh);
     tracers.push(mesh);
+  }
+
+  // Everything the pistol can hit, as ray targets, nearest first by the ray test.
+  function collectTargets(ctx) {
+    const targets = [];
+    for (const e of enemies) targets.push({ x: e.x, z: e.z, y: 1.2, radius: 1.1, ref: e, kind: 'enemy' });
+    for (const p of ctx.peds.peds) targets.push({ x: p.x, z: p.z, y: 1.2, radius: 1, ref: p, kind: 'ped' });
+    for (const u of ctx.police.units) {
+      if (u.kind === 'cop') targets.push({ x: u.x, z: u.z, y: 1.2, radius: 1, ref: u, kind: 'cop' });
+      else targets.push({ x: u.x, z: u.z, y: 1, radius: 2.4, ref: u, kind: 'policeCar' });
+    }
+    for (const c of ctx.traffic.cars) targets.push({ x: c.x, z: c.z, y: 1, radius: 2.4, ref: c, kind: 'car' });
+    return targets;
+  }
+
+  function applyShotHit(ctx, hit) {
+    const kind = hit.target.kind;
+    if (kind === 'enemy') {
+      hit.target.ref.health -= PISTOL_DAMAGE;
+      ctx.audio.hit();
+      if (hit.target.ref.health <= 0) removeEnemy(hit.target.ref);
+    } else if (kind === 'cop') {
+      ctx.police.addWanted(1);
+      ctx.audio.hit();
+    } else if (kind === 'ped') {
+      ctx.police.addWanted(1);
+      ctx.peds.scare(hit.target.x, hit.target.z, 20);
+    } else if (kind === 'policeCar' || kind === 'car') {
+      hit.target.ref.health -= PISTOL_DAMAGE;
+      if (hit.target.ref.health <= 0 && kind === 'car') ctx.audio.crash();
+    }
+    // Firing a gun where the law can see it draws heat.
+    if (wantedRaiseCooldown <= 0) {
+      for (const u of ctx.police.units) {
+        if (Math.hypot(u.x - ctx.player.x, u.z - ctx.player.z) < 55) {
+          ctx.police.addWanted(1);
+          wantedRaiseCooldown = 3;
+          break;
+        }
+      }
+    }
+  }
+
+  function tryPunch(ctx) {
+    if (!ctx.input.wasPressed('punch') || punchCooldown > 0) return;
+    punchCooldown = 0.45;
+    combo = comboTimer > 0 ? combo + 1 : 1;
+    comboTimer = COMBAT.punchComboWindow;
+    const finisher = combo >= 3;
+    if (finisher) combo = 0;
+    const damage = finisher ? PUNCH_DAMAGE * 2 : PUNCH_DAMAGE;
+    ctx.audio.punch();
+    const fx = Math.sin(ctx.player.heading);
+    const fz = Math.cos(ctx.player.heading);
+    const hitList = [];
+    for (const e of enemies) hitList.push({ x: e.x, z: e.z, radius: 1, ref: e, kind: 'enemy' });
+    for (const p of ctx.peds.peds) hitList.push({ x: p.x, z: p.z, radius: 1, ref: p, kind: 'ped' });
+    for (const u of ctx.police.units) {
+      if (u.kind === 'cop') hitList.push({ x: u.x, z: u.z, radius: 1, ref: u, kind: 'cop' });
+    }
+    for (const h of hitList) {
+      const dx = h.x - ctx.player.x;
+      const dz = h.z - ctx.player.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 2.4 && (dx * fx + dz * fz) / (d || 1) > 0.4) {
+        if (h.kind === 'enemy') {
+          h.ref.health -= damage;
+          ctx.audio.hit();
+          if (h.ref.health <= 0) removeEnemy(h.ref);
+        } else if (h.kind === 'cop') {
+          ctx.police.addWanted(1);
+          ctx.audio.hit();
+        } else {
+          ctx.peds.scare(h.x, h.z, 8);
+          ctx.police.addWanted(1);
+        }
+        break;
+      }
+    }
+  }
+
+  function tryShoot(ctx) {
+    if (!ctx.input.shootClicked() || fireCooldown > 0 || ctx.screen !== 'play') return;
+    if (reloadTimer > 0) {
+      // Mid-reload: the trigger does nothing.
+      return;
+    }
+    if (ammo <= 0) {
+      ctx.audio.click();
+      startReload(ctx.audio);
+      return;
+    }
+    ammo -= 1;
+    fireCooldown = FIRE_INTERVAL;
+    const origin = ctx.shootOrigin;
+    const dir = ctx.shootDir;
+    const hit = rayHit(origin, dir, collectTargets(ctx));
+    const end = hit
+      ? { x: origin.x + dir.x * hit.distance, y: origin.y + dir.y * hit.distance, z: origin.z + dir.z * hit.distance }
+      : { x: origin.x + dir.x * PISTOL_RANGE, y: origin.y + dir.y * PISTOL_RANGE, z: origin.z + dir.z * PISTOL_RANGE };
+    addTracer(origin, end);
+    ctx.audio.shoot();
+    ctx.peds.scare(ctx.player.x, ctx.player.z, 40);
+    if (hit) applyShotHit(ctx, hit);
+  }
+
+  function updateEnemies(dt, ctx) {
+    for (const e of [...enemies]) {
+      const dx = ctx.player.x - e.x;
+      const dz = ctx.player.z - e.z;
+      const dist = Math.hypot(dx, dz);
+      e.heading = Math.atan2(dx, dz);
+      e.mesh.rotation.y = e.heading;
+      if (dist > 9) {
+        e.x += Math.sin(e.heading) * 3.4 * dt;
+        e.z += Math.cos(e.heading) * 3.4 * dt;
+        e.walkPhase += dt * 8;
+        e.mesh.rotation.x = Math.sin(e.walkPhase) * 0.05;
+      } else {
+        e.shootTimer -= dt;
+        if (e.shootTimer <= 0) {
+          e.shootTimer = random.range(1.1, 2.2);
+          addTracer({ x: e.x, y: 1.4, z: e.z }, { x: ctx.player.x, y: 1.2, z: ctx.player.z });
+          ctx.audio.shoot();
+          if (Math.random() < 0.45) ctx.damagePlayer(9);
+        }
+      }
+      const pos = { x: e.x, z: e.z };
+      ctx.city.collideCircle(pos, 0.5);
+      e.x = pos.x;
+      e.z = pos.z;
+      e.mesh.position.set(e.x, 0, e.z);
+    }
   }
 
   return {
@@ -143,130 +274,13 @@ export function createCombat(scene, random) {
         }
       }
       // Player punch (F): a three-hit combo — the third hit is a heavy finisher.
-      if (ctx.input.wasPressed('punch') && punchCooldown <= 0) {
-        punchCooldown = 0.45;
-        combo = comboTimer > 0 ? combo + 1 : 1;
-        comboTimer = COMBAT.punchComboWindow;
-        const finisher = combo >= 3;
-        if (finisher) combo = 0;
-        const damage = finisher ? PUNCH_DAMAGE * 2 : PUNCH_DAMAGE;
-        ctx.audio.punch();
-        const fx = Math.sin(ctx.player.heading);
-        const fz = Math.cos(ctx.player.heading);
-        const hitList = [];
-        for (const e of enemies) hitList.push({ x: e.x, z: e.z, radius: 1, ref: e, kind: 'enemy' });
-        for (const p of ctx.peds.peds) hitList.push({ x: p.x, z: p.z, radius: 1, ref: p, kind: 'ped' });
-        for (const u of ctx.police.units) {
-          if (u.kind === 'cop') hitList.push({ x: u.x, z: u.z, radius: 1, ref: u, kind: 'cop' });
-        }
-        for (const h of hitList) {
-          const dx = h.x - ctx.player.x;
-          const dz = h.z - ctx.player.z;
-          const d = Math.hypot(dx, dz);
-          if (d < 2.4 && (dx * fx + dz * fz) / (d || 1) > 0.4) {
-            if (h.kind === 'enemy') {
-              h.ref.health -= damage;
-              ctx.audio.hit();
-              if (h.ref.health <= 0) removeEnemy(h.ref);
-            } else if (h.kind === 'cop') {
-              ctx.police.addWanted(1);
-              ctx.audio.hit();
-            } else {
-              ctx.peds.scare(h.x, h.z, 8);
-              ctx.police.addWanted(1);
-            }
-            break;
-          }
-        }
-      }
+      tryPunch(ctx);
       // Reload (R), or automatically when the magazine runs dry.
       if (ctx.input.wasPressed('reload')) startReload(ctx.audio);
       // Player pistol: mouse click fires from the camera toward its forward ray.
-      if (ctx.input.shootClicked() && fireCooldown <= 0 && ctx.screen === 'play') {
-        if (reloadTimer > 0) {
-          // Mid-reload: the trigger does nothing.
-        } else if (ammo <= 0) {
-          ctx.audio.click();
-          startReload(ctx.audio);
-        } else {
-          ammo -= 1;
-          fireCooldown = FIRE_INTERVAL;
-        const origin = ctx.shootOrigin;
-        const dir = ctx.shootDir;
-        const targets = [];
-        for (const e of enemies) targets.push({ x: e.x, z: e.z, y: 1.2, radius: 1.1, ref: e, kind: 'enemy' });
-        for (const p of ctx.peds.peds) targets.push({ x: p.x, z: p.z, y: 1.2, radius: 1, ref: p, kind: 'ped' });
-        for (const u of ctx.police.units) {
-          if (u.kind === 'cop') targets.push({ x: u.x, z: u.z, y: 1.2, radius: 1, ref: u, kind: 'cop' });
-          else targets.push({ x: u.x, z: u.z, y: 1, radius: 2.4, ref: u, kind: 'policeCar' });
-        }
-        for (const c of ctx.traffic.cars) targets.push({ x: c.x, z: c.z, y: 1, radius: 2.4, ref: c, kind: 'car' });
-        const hit = rayHit(origin, dir, targets);
-        const end = hit
-          ? { x: origin.x + dir.x * hit.distance, y: origin.y + dir.y * hit.distance, z: origin.z + dir.z * hit.distance }
-          : { x: origin.x + dir.x * PISTOL_RANGE, y: origin.y + dir.y * PISTOL_RANGE, z: origin.z + dir.z * PISTOL_RANGE };
-        addTracer(origin, end);
-        ctx.audio.shoot();
-        ctx.peds.scare(ctx.player.x, ctx.player.z, 40);
-        if (hit) {
-          if (hit.target.kind === 'enemy') {
-            hit.target.ref.health -= PISTOL_DAMAGE;
-            ctx.audio.hit();
-            if (hit.target.ref.health <= 0) removeEnemy(hit.target.ref);
-          } else if (hit.target.kind === 'cop') {
-            ctx.police.addWanted(1);
-            ctx.audio.hit();
-          } else if (hit.target.kind === 'ped') {
-            ctx.police.addWanted(1);
-            ctx.peds.scare(hit.target.x, hit.target.z, 20);
-          } else if (hit.target.kind === 'policeCar' || hit.target.kind === 'car') {
-            hit.target.ref.health -= PISTOL_DAMAGE;
-            if (hit.target.ref.health <= 0 && hit.target.kind === 'car') ctx.audio.crash();
-          }
-          // Firing a gun where the law can see it draws heat.
-          if (wantedRaiseCooldown <= 0) {
-            for (const u of ctx.police.units) {
-              if (Math.hypot(u.x - ctx.player.x, u.z - ctx.player.z) < 55) {
-                ctx.police.addWanted(1);
-                wantedRaiseCooldown = 3;
-                break;
-              }
-            }
-          }
-        }
-        }
-      }
+      tryShoot(ctx);
       // Enemies: close in and shoot at the player.
-      for (const e of [...enemies]) {
-        const dx = ctx.player.x - e.x;
-        const dz = ctx.player.z - e.z;
-        const dist = Math.hypot(dx, dz);
-        e.heading = Math.atan2(dx, dz);
-        e.mesh.rotation.y = e.heading;
-        if (dist > 9) {
-          e.x += Math.sin(e.heading) * 3.4 * dt;
-          e.z += Math.cos(e.heading) * 3.4 * dt;
-          e.walkPhase += dt * 8;
-          e.mesh.rotation.x = Math.sin(e.walkPhase) * 0.05;
-        } else {
-          e.shootTimer -= dt;
-          if (e.shootTimer <= 0) {
-            e.shootTimer = random.range(1.1, 2.2);
-            const from = { x: e.x, y: 1.4, z: e.z };
-            const to = { x: ctx.player.x, y: 1.2, z: ctx.player.z };
-            addTracer(from, to);
-            ctx.audio.shoot();
-            if (Math.random() < 0.45) {
-              ctx.damagePlayer(9);
-            }
-          }
-        }
-        const pos = { x: e.x, z: e.z };
-        ctx.city.collideCircle(pos, 0.5);
-        e.x = pos.x;
-        e.z = pos.z;
-        e.mesh.position.set(e.x, 0, e.z);
-      }
+      updateEnemies(dt, ctx);
     },
   };
 }

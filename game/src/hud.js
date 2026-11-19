@@ -22,6 +22,7 @@ export function createHud(doc) {
 
   const STAR_ON = '★';
   const STAR_OFF = '☆';
+  const SCREENS = ['screen-start', 'screen-pause', 'screen-wasted', 'screen-complete'];
 
   return {
     setHealth(hp, max) {
@@ -80,15 +81,11 @@ export function createHud(doc) {
       }
     },
     showScreen(name) {
-      for (const id of ['screen-start', 'screen-pause', 'screen-wasted', 'screen-complete']) {
-        $(id).classList.toggle('show', id === `screen-${name}`);
-      }
+      for (const id of SCREENS) $(id).classList.toggle('show', id === `screen-${name}`);
       $('hud').classList.toggle('hidden', name === 'start');
     },
     hideScreens() {
-      for (const id of ['screen-start', 'screen-pause', 'screen-wasted', 'screen-complete']) {
-        $(id).classList.remove('show');
-      }
+      for (const id of SCREENS) $(id).classList.remove('show');
       $('hud').classList.remove('hidden');
     },
     setSaveInfo(text) {

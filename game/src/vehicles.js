@@ -4,6 +4,7 @@ import { CAR, CAR_OWNERS, TRAFFIC, WORLD } from './config.js';
 
 const CAR_COLORS = [0xb8332c, 0x2c6bb8, 0xd8a13c, 0x3a9a4a, 0x8a8f96, 0x1d2733, 0x7a4a9a, 0xc8c8c8, 0x4a6a7a, 0xe8e4da];
 const HALF_BOUND = WORLD.half + 2;
+// Shared geometry: every car on the street is built from the same four shapes.
 const BODY_GEO = new THREE.BoxGeometry(2.0, 0.55, 4.4);
 const CABIN_GEO = new THREE.BoxGeometry(1.7, 0.5, 2.2);
 const WHEEL_GEO = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 12);
@@ -25,23 +26,20 @@ export function createCarMesh(color, opts = {}) {
   cabin.scale.y = opts.sport ? 0.8 : 1;
   cabin.castShadow = true;
   g.add(cabin);
-  const wheelMat = tyre;
   const wheels = [];
   for (const [wx, wz] of [[-0.95, 1.45], [0.95, 1.45], [-0.95, -1.45], [0.95, -1.45]]) {
-    const wheel = new THREE.Mesh(WHEEL_GEO, wheelMat);
+    const wheel = new THREE.Mesh(WHEEL_GEO, tyre);
     wheel.rotation.z = Math.PI / 2;
     wheel.position.set(wx, 0.38, wz);
     g.add(wheel);
     wheels.push(wheel);
   }
   const headMat = new THREE.MeshBasicMaterial({ color: 0xfff2c8 });
+  const tailMat = new THREE.MeshBasicMaterial({ color: 0xc02020 });
   for (const hx of [-0.6, 0.6]) {
     const h = new THREE.Mesh(LIGHT_GEO, headMat);
     h.position.set(hx, 0.62, 2.21);
     g.add(h);
-  }
-  const tailMat = new THREE.MeshBasicMaterial({ color: 0xc02020 });
-  for (const hx of [-0.6, 0.6]) {
     const t = new THREE.Mesh(LIGHT_GEO, tailMat);
     t.position.set(hx, 0.62, -2.21);
     g.add(t);
@@ -61,9 +59,7 @@ export function createCarMesh(color, opts = {}) {
 }
 
 function edgeLength(nodes, a, b) {
-  const dx = nodes[b].x - nodes[a].x;
-  const dz = nodes[b].z - nodes[a].z;
-  return Math.hypot(dx, dz);
+  return Math.hypot(nodes[b].x - nodes[a].x, nodes[b].z - nodes[a].z);
 }
 
 export function createTraffic(city, scene, random) {
@@ -73,8 +69,7 @@ export function createTraffic(city, scene, random) {
   function randomEdge() {
     const a = random.int(0, nodes.length - 1);
     const edges = nodes[a].edges;
-    const b = edges[random.int(0, edges.length - 1)];
-    return { a, b };
+    return { a, b: edges[random.int(0, edges.length - 1)] };
   }
 
   function spawnCar(parked, spec) {
@@ -95,9 +90,8 @@ export function createTraffic(city, scene, random) {
       edgeB: 0,
       t: 0,
       dir: 1,
-      ox: 0,
+      ox: 0, // collision nudge offset, decays back to the lane
       oz: 0,
-      brake: false,
       // Keys are identities: every car belongs to someone.
       owner: spec?.owner ?? CAR_OWNERS[random.int(0, CAR_OWNERS.length - 1)],
     };
@@ -137,9 +131,21 @@ export function createTraffic(city, scene, random) {
     car.heading = car.dir > 0 ? Math.atan2(b.x - a.x, b.z - a.z) : Math.atan2(a.x - b.x, a.z - b.z);
     car.mesh.position.set(car.x, 0, car.z);
     car.mesh.rotation.y = car.heading;
-    // Spin the wheels with speed.
     const spin = (car.speed / 0.38) * 0.016;
     for (const w of car.mesh.userData.wheels) w.rotation.x += spin;
+  }
+
+  // How fast may this car go, given the car ahead of it (if any)?
+  function speedFor(car, other, target) {
+    const dx = other.x - car.x;
+    const dz = other.z - car.z;
+    const dist = Math.hypot(dx, dz);
+    if (dist >= 11 || dist <= 0.01) return target;
+    const fx = Math.sin(car.heading);
+    const fz = Math.cos(car.heading);
+    const ahead = (dx * fx + dz * fz) / dist;
+    if (ahead <= 0.55) return target;
+    return Math.min(target, Math.max(0, (dist - 6) * 0.9));
   }
 
   return {
@@ -162,7 +168,7 @@ export function createTraffic(city, scene, random) {
       car.speed = 0;
       if (!cars.includes(car)) cars.push(car);
     },
-    /** Nearest non-parked car to a point, within maxDist. */
+    /** Nearest car to a point, within maxDist (parked cars count too). */
     nearest(x, z, maxDist) {
       let best = null;
       let bestD = maxDist * maxDist;
@@ -186,27 +192,10 @@ export function createTraffic(city, scene, random) {
         }
         // Slow down for a car ahead (traffic or the player's car).
         let target = car.maxSpeed;
-        const fx = Math.sin(car.heading);
-        const fz = Math.cos(car.heading);
         for (const other of cars) {
-          if (other === car) continue;
-          const dx = other.x - car.x;
-          const dz = other.z - car.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 11 && dist > 0.01) {
-            const ahead = (dx * fx + dz * fz) / dist;
-            if (ahead > 0.55) target = Math.min(target, Math.max(0, (dist - 6) * 0.9));
-          }
+          if (other !== car) target = speedFor(car, other, target);
         }
-        if (playerCar) {
-          const dx = playerCar.x - car.x;
-          const dz = playerCar.z - car.z;
-          const dist = Math.hypot(dx, dz);
-          if (dist < 11 && dist > 0.01) {
-            const ahead = (dx * fx + dz * fz) / dist;
-            if (ahead > 0.55) target = Math.min(target, Math.max(0, (dist - 6) * 0.9));
-          }
-        }
+        if (playerCar) target = speedFor(car, playerCar, target);
         car.speed += (target - car.speed) * Math.min(1, dt * 2.5);
         const len = edgeLength(nodes, car.edgeA, car.edgeB);
         car.t += (car.speed * dt) / len;
